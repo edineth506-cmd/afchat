@@ -1,0 +1,70 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="max-w-md mx-auto bg-gray-800 p-8 rounded-lg shadow-xl">
+    <h1 class="text-3xl font-bold mb-6 text-white text-center">Register</h1>
+    
+    <form id="register-form" class="space-y-6">
+        <div>
+            <label for="email" class="block text-sm font-medium text-gray-300 mb-2">Email</label>
+            <input type="email" id="email" name="email" required
+                   class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+            <label for="password" class="block text-sm font-medium text-gray-300 mb-2">Password</label>
+            <input type="password" id="password" name="password" required minlength="6"
+                   class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <p class="text-xs text-gray-400 mt-1">Must be at least 6 characters.</p>
+        </div>
+        
+        <div id="error-message" class="text-red-400 text-sm hidden"></div>
+        
+        <div>
+            <button type="submit" id="register-btn"
+                    class="w-full p-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition duration-200">
+                Create Account
+            </button>
+        </div>
+    </form>
+    
+    <p class="text-center text-gray-400 mt-6">
+        Already have an account? <a href="{{ url_for('login') }}" class="text-indigo-400 hover:underline">Login here</a>
+    </p>
+</div>
+
+<script>
+    // Wait for the layout's main auth script to load
+    setTimeout(() => {
+        const registerForm = document.getElementById('register-form');
+        const registerBtn = document.getElementById('register-btn');
+        const emailEl = document.getElementById('email');
+        const passwordEl = document.getElementById('password');
+        const errorEl = document.getElementById('error-message');
+
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            registerBtn.disabled = true;
+            registerBtn.innerText = 'Creating...';
+            errorEl.classList.add('hidden');
+
+            const email = emailEl.value;
+            const password = passwordEl.value;
+
+            try {
+                // Use the Firebase auth SDK
+                await firebase.auth().createUserWithEmailAndPassword(email, password);
+                // Auth state change is handled by layout.html
+                // It will send the token and then we redirect
+                window.location.href = "{{ url_for('my_bots') }}"; // Redirect to 'My Bots' page on success
+
+            } catch (error) {
+                console.error('Register Error:', error);
+                errorEl.innerText = error.message;
+                errorEl.classList.remove('hidden');
+                registerBtn.disabled = false;
+                registerBtn.innerText = 'Create Account';
+            }
+        });
+    }, 100); // Wait 100ms
+</script>
+{% endblock %}
