@@ -178,7 +178,6 @@
 
 <!-- JAVASCRIPT for image handling (THIS IS THE FIX) -->
 <script type="module">
-    // By using type="module", we don't need DOMContentLoaded or setTimeout
     // This script will correctly wait for the layout.html module to load.
     // It also gains access to the global `openImageModal` and `window.fetchWithAuth` functions.
 
@@ -233,7 +232,7 @@
         hiddenUrlInput.value = imageUrl;
         errorArea.classList.add('hidden');
         
-        // Add click listener
+        // --- THIS IS THE FIX ---
         // We can call openImageModal because it's defined globally in layout.html
         previewArea.addEventListener('click', () => openImageModal(imageUrl));
     }
