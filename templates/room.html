@@ -1,0 +1,158 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<!-- (Your existing style block) -->
+<!-- ... -->
+
+<div class="flex flex-col md:flex-row gap-6">
+    
+    <!-- Main Chat Area -->
+    <div class="flex-grow md:w-2/3">
+        <div class="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+            
+            <!-- Room Header (UPDATED) -->
+            <div class="p-4 border-b border-gray-700 flex items-center gap-4">
+                <img 
+                    id="header-avatar-btn" 
+                    src="{{ room.bot_image_url | default('...', true) }}" 
+                    alt="{{ room.bot_name }}" 
+                    class="w-16 h-16 rounded-full ... cursor-pointer"
+                >
+                <div class="flex-grow">
+                    <h1 class="text-2xl font-bold text-white">Chat with {{ room.bot_name }}</h1>
+                    <p class="text-sm text-gray-400">
+                        Room Code: <strong class="text-white">{{ room_code }}</strong>
+                    </p>
+                    <p class="text-sm text-gray-400">
+                        Bot Owner: <strong class="text-white">{{ room.owner_email | default('N/A') }}</strong>
+                    </p>
+                </div>
+                <!-- === NEW: Delete Button for Owner === -->
+                {% if is_owner %}
+                <form action="{{ url_for('delete_bot') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this bot? This cannot be undone.');">
+                    <input type="hidden" name="room_code" value="{{ room_code }}">
+                    <button type="submit" class="p-2 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700">
+                        DELETE BOT
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+            
+            <!-- (Chat Messages and Message Input Form are the same HTML) -->
+            <!-- ... -->
+        </div>
+    </div>
+    
+    <!-- (Sidebar is the same HTML) -->
+    <!-- ... -->
+</div>
+
+<!-- === FIREBASE JAVASCRIPT SDKS === -->
+<script type="module">
+    // --- Import (Firestore is now needed) ---
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+    import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+    // We also need Auth to get the current user
+    import { getAuth } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
+
+    // --- YOUR FIREBASE CONFIG ---
+    const firebaseConfig = {
+      // ... (your config) ...
+    };
+    // ----------------------------------------------------
+
+    // Initialize Firebase client
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app); // <-- NEW
+
+    // We must wait for the global auth script AND this page's content
+    setTimeout(() => {
+        document.addEventListener('DOMContentLoaded', (event) => {
+        
+            // ... (all your const variables: chatBox, leaderboard, etc.) ...
+            
+            // This 'user_id' is now the logged-in user's UID
+            const currentUserID = '{{ user_id }}'; 
+            const botName = '{{ room.bot_name }}'; 
+            const botAvatarUrl = '{{ room.bot_image_url | default("", true) }}';
+            
+            // ... (rest of your JS, e.g., helper functions, buildChatUI, buildLeaderboardUI) ...
+            
+            // --- UI Building (Updated) ---
+            function buildChatUI(messages) {
+                // ... (this function is mostly the same) ...
+                // --- BIG CHANGE: We now check 'msg.user_id' ---
+                
+                sortedMessages.forEach(msg => {
+                    // ...
+                    if (msg.user_id === 'System') {
+                        // ...
+                    } else if (msg.user_id === botName) {
+                        // ...
+                    } else {
+                        displayName = userNicknames[msg.user_id] || msg.user_id; 
+                        if (msg.user_id === currentUserID) {
+                            // ... (this is "self")
+                        } else {
+                            // ... (this is "other user")
+                        }
+                    }
+                    // ...
+                    // --- Alignment wrappers ---
+                    if (msg.user_id === 'System') {
+                        // ...
+                    } else if (msg.user_id === currentUserID) {
+                        // ...
+                    } else {
+                        // ... (this is bot or other)
+                        if (msg.user_id === botName && botAvatarUrl) {
+                            wrapper.innerHTML = avatarImg;
+                        }
+                        wrapper.appendChild(msgEl);
+                        chatBox.appendChild(wrapper);
+                    }
+                });
+                // ...
+            }
+            
+            // ... (buildLeaderboardUI is the same) ...
+            // ... (onSnapshot is the same) ...
+
+            // --- Form submission (UPDATED) ---
+            if (messageForm) {
+                messageForm.addEventListener('submit', async (e) => {
+                    e.preventDefault(); 
+                    // ... (get message, optimistic UI) ...
+                    
+                    try {
+                        const formData = new FormData();
+                        formData.append('message', messageToSend);
+
+                        // --- THIS IS THE CHANGE ---
+                        // Use fetchWithAuth() instead of fetch()
+                        const response = await window.fetchWithAuth(messageForm.action, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        // --- END OF CHANGE ---
+                        
+                        if (!response.ok) {
+                            console.error('Failed to send message');
+                            removeTypingIndicator();
+                        }
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                        removeTypingIndicator();
+                    } 
+                });
+            } else {
+                console.error('Could not find message-form');
+            }
+
+            // --- (Click Event Listeners for modal are the same) ---
+            // ...
+        });
+    }, 100); // Wait 100ms for auth script to load
+</script>
+{% endblock %}
