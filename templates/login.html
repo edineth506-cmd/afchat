@@ -50,6 +50,8 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
+    // --- THIS IS THE FIX ---
+    // We use DOMContentLoaded to make sure the form exists before we add a listener
     document.addEventListener('DOMContentLoaded', () => {
         const loginForm = document.getElementById('login-form');
         const loginBtn = document.getElementById('login-btn');
@@ -57,30 +59,33 @@
         const passwordEl = document.getElementById('password');
         const errorEl = document.getElementById('error-message');
 
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            loginBtn.disabled = true;
-            loginBtn.innerText = 'Logging in...';
-            errorEl.classList.add('hidden');
+        if (loginForm) {
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault(); // This stops the "refresh"
+                loginBtn.disabled = true;
+                loginBtn.innerText = 'Logging in...';
+                errorEl.classList.add('hidden');
 
-            const email = emailEl.value;
-            const password = passwordEl.value;
+                const email = emailEl.value;
+                const password = passwordEl.value;
 
-            try {
-                // Use the v9 Firebase auth SDK
-                await signInWithEmailAndPassword(auth, email, password);
-                // Auth state change is handled by layout.html
-                // It will send the token and then we redirect
-                window.location.href = "{{ url_for('my_bots') }}"; // Redirect to 'My Bots' page on success
+                try {
+                    // Use the v9 Firebase auth SDK
+                    await signInWithEmailAndPassword(auth, email, password);
+                    // Auth state change is handled by layout.html
+                    // It will send the token and then we redirect
+                    window.location.href = "{{ url_for('my_bots') }}"; // Redirect to 'My Bots' page on success
 
-            } catch (error) {
-                console.error('Login Error:', error);
-                errorEl.innerText = error.message;
-                errorEl.classList.remove('hidden');
-                loginBtn.disabled = false;
-                loginBtn.innerText = 'Login';
-            }
-        });
+                } catch (error) {
+                    console.error('Login Error:', error);
+                    errorEl.innerText = error.message;
+                    errorEl.classList.remove('hidden');
+                    loginBtn.disabled = false;
+                    loginBtn.innerText = 'Login';
+                }
+            });
+        }
     });
+    // --- END OF FIX ---
 </script>
 {% endblock %}
