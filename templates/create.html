@@ -2,7 +2,23 @@
 
 {% block content %}
 <style>
-    /* ... (your existing tab styles) ... */
+    /* Simple styles for the tabs */
+    .tab-btn {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        color: #9ca3af; /* text-gray-400 */
+    }
+    .tab-btn.active {
+        color: #e2e8f0; /* text-gray-200 */
+        border-bottom-color: #6366f1; /* border-indigo-500 */
+    }
+    .tab-content {
+        display: none;
+    }
+    .tab-content.active {
+        display: block;
+    }
 </style>
 
 <div class="max-w-xl mx-auto bg-gray-800 p-8 rounded-lg shadow-xl">
@@ -10,30 +26,54 @@
     
     <form id="create-room-form" action="{{ url_for('create_room') }}" method="POST" class="space-y-6">
         
-        <!-- Part 1: Your Info (Unchanged) -->
-        <!-- Your 'nickname' field is no longer needed, we use your email -->
-        
-        <!-- Part 2: Bot Info (Updated) -->
+        <!-- Part 1: Bot Info -->
         <fieldset class="border border-gray-700 p-4 rounded-lg space-y-6">
             <legend class="text-lg font-medium text-white px-2">Bot Info</legend>
             <div>
                 <label for="bot_name" class="block text-sm font-medium text-gray-300 mb-2">Bot's Name</label>
-                <input type="text" name="bot_name" id="bot_name" required ... >
+                <input 
+                    type="text" 
+                    name="bot_name" 
+                    id="bot_name" 
+                    required
+                    placeholder="e.g., 'Elara' or 'Professor Kaito'"
+                    class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
             </div>
             
             <div>
                 <label for="bot_personality" class="block text-sm font-medium text-gray-300 mb-2">Personality</label>
-                <textarea name="bot_personality" id="bot_personality" ... ></textarea>
+                <textarea 
+                    name="bot_personality" 
+                    id="bot_personality" 
+                    rows="3" 
+                    required
+                    placeholder="A shy and bookish librarian who loves cats. Gets flustered easily but is very kind."
+                    class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                ></textarea>
             </div>
 
             <div>
                 <label for="start_scenario" class="block text-sm font-medium text-gray-300 mb-2">Starting Scenario</label>
-                <textarea name="start_scenario" id="start_scenario" ... ></textarea>
+                <textarea 
+                    name="start_scenario" 
+                    id="start_scenario" 
+                    rows="3" 
+                    required
+                    placeholder="You all meet the bot in a mysterious, rainy-day cafe. The bot is reading a book alone at a corner table."
+                    class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                ></textarea>
             </div>
 
             <div>
                 <label for="difficulty" class="block text-sm font-medium text-gray-300 mb-2">Difficulty (1-10)</label>
-                <input type="range" id="difficulty" name="difficulty" ... >
+                <input 
+                    type="range" 
+                    id="difficulty" 
+                    name="difficulty"
+                    min="1" max="10" value="5"
+                    class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                >
             </div>
 
             <!-- === NEW: Public/Private Toggle === -->
@@ -44,15 +84,93 @@
             <p class="text-xs text-gray-400">If public, anyone can find and chat with your bot. If private, they will need a room code (which you can get from 'My Bots').</p>
         </fieldset>
         
-        <!-- Part 3: Bot Appearance & Image (Unchanged) -->
+        <!-- Part 2: Bot Appearance & Image -->
         <fieldset class="border border-gray-700 p-4 rounded-lg space-y-6">
-            <!-- ... (all your tab HTML is the same) ... -->
+            <legend class="text-lg font-medium text-white px-2">Bot Appearance</legend>
+
+            <!-- Tab Buttons -->
+            <div class="flex border-b border-gray-700">
+                <button type="button" class="tab-btn active" data-tab="generate">Generate Image (AI)</button>
+                <button type="button" class="tab-btn" data-tab="upload">Upload Image</button>
+            </div>
+
+            <!-- Tab 1: Generate Image -->
+            <div id="tab-generate" class="tab-content active space-y-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="gender" class="block text-sm font-medium text-gray-300 mb-2">Gender</label>
+                        <select id="gender" name="gender" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="girl">Girl</option>
+                            <option value="boy">Boy</option>
+                            <option value="person">Person</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="age" class="block text-sm font-medium text-gray-300 mb-2">Age</label>
+                        <input type="number" id="age" name="age" min="18" value="20" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="appearance" class="block text-sm font-medium text-gray-300 mb-2">Appearance Prompt</label>
+                    <textarea 
+                        name="appearance" 
+                        id="appearance" 
+                        rows="3" 
+                        placeholder="e.g., 'long silver hair, green eyes, wearing a black jacket', 'curly brown hair, glasses, friendly smile'"
+                        class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    ></textarea>
+                </div>
+
+                <button 
+                    type="button" 
+                    id="generate-image-btn"
+                    class="w-full p-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition duration-200"
+                >
+                    Generate Bot Image
+                </button>
+            </div>
+
+            <!-- Tab 2: Upload Image -->
+            <div id="tab-upload" class="tab-content space-y-6">
+                <div>
+                    <label for="file-input" class="block text-sm font-medium text-gray-300 mb-2">Upload a custom image</label>
+                    <input 
+                        type="file" 
+                        id="file-input" 
+                        name="file" 
+                        accept="image/png, image/jpeg, image/webp"
+                        class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
+                    >
+                </div>
+                <button 
+                    type="button" 
+                    id="upload-image-btn"
+                    class="w-full p-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition duration-200"
+                >
+                    Upload Custom Image
+                </button>
+            </div>
+
+            <!-- This is the shared preview area -->
+            <div class="text-sm font-medium text-gray-300">Image Preview:</div>
+            <div id="image-preview-area" class="w-full h-48 bg-gray-700 rounded-lg flex items-center justify-center text-gray-400">
+                Generate or Upload an image
+            </div>
+            <div id="image-error-area" class="text-red-400 text-sm hidden"></div>
+
+            <!-- This hidden input stores the final image URL -->
+            <input type="hidden" id="bot_image_url" name="bot_image_url" value="">
         </fieldset>
 
         <!-- Form Submission Buttons -->
         <div class="flex justify-between items-center pt-4">
             <a href="{{ url_for('my_bots') }}" class="text-gray-400 hover:text-white">Cancel</a>
-            <button type="submit" id="create-room-btn" ... >
+            <button 
+                type="submit" 
+                id="create-room-btn"
+                class="p-3 px-6 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition duration-200"
+            >
                 Create Room
             </button>
         </div>
@@ -64,23 +182,77 @@
     // We need to wait for the global auth script from layout.html
     // A simple timeout is the easiest way
     setTimeout(() => {
+        // All of our JS logic must be inside this listener
         document.addEventListener('DOMContentLoaded', () => {
             const generateBtn = document.getElementById('generate-image-btn');
             const uploadBtn = document.getElementById('upload-image-btn');
-            // ... (all other const variables are the same) ...
-
-            // ... (Tab Switching Logic is the same) ...
+            const fileInput = document.getElementById('file-input');
             
-            // ... (showLoading, showError, showSuccess are the same) ...
-            // ... (and your new showSuccess click listener is correct) ...
+            const previewArea = document.getElementById('image-preview-area');
+            const errorArea = document.getElementById('image-error-area');
+            const hiddenUrlInput = document.getElementById('bot_image_url');
+            
+            const tabs = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
 
-            // --- 1. AI Image Generation Logic (UPDATED) ---
-            generateBtn.addEventListener('click', async () => {
-                // ... (your existing logic to get appearance, show loading, etc.) ...
+            // --- Tab Switching Logic ---
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(c => c.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+                });
+            });
+
+            // --- Loading Spinner Function ---
+            function showLoading(message) {
+                previewArea.innerHTML = `
+                    <div class="flex flex-col items-center">
+                        <svg class="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="mt-2 text-sm">${message}</span>
+                    </div>
+                `;
+                errorArea.classList.add('hidden');
+                errorArea.innerText = '';
+            }
+
+            // --- Show Error Function ---
+            function showError(message) {
+                previewArea.innerHTML = 'Generate or Upload an image';
+                errorArea.innerText = `Error: ${message}`;
+                errorArea.classList.remove('hidden');
+            }
+
+            // --- Show Image Success Function ---
+            function showSuccess(imageUrl) {
+                previewArea.innerHTML = `
+                    <img src="${imageUrl}" alt="Bot Preview" class="w-full h-full object-cover rounded-lg cursor-pointer">
+                `;
+                hiddenUrlInput.value = imageUrl;
+                errorArea.classList.add('hidden');
                 
+                // Add click listener
+                previewArea.addEventListener('click', () => openImageModal(imageUrl));
+            }
+
+            // --- 1. AI Image Generation Logic ---
+            generateBtn.addEventListener('click', async () => {
+                const appearance = document.getElementById('appearance').value;
+                if (!appearance.trim()) {
+                    showError('Please describe the bot\'s appearance first.');
+                    return;
+                }
+
+                showLoading('Generating image... this may take a moment.');
+                generateBtn.disabled = true;
+                generateBtn.innerText = 'Generating...';
+
                 try {
-                    // --- THIS IS THE CHANGE ---
-                    // Use fetchWithAuth() instead of fetch()
+                    // Use the global fetchWithAuth function
                     const response = await window.fetchWithAuth("{{ url_for('generate_bot_image') }}", {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -90,7 +262,6 @@
                             appearance: appearance
                         }),
                     });
-                    // --- END OF CHANGE ---
 
                     const data = await response.json();
                     if (response.ok && data.success) {
@@ -107,21 +278,27 @@
                 }
             });
 
-            // --- 2. Custom Image Upload Logic (UPDATED) ---
+            // --- 2. Custom Image Upload Logic ---
             uploadBtn.addEventListener('click', async () => {
-                // ... (your existing logic to get file, show loading, etc.) ...
-                
+                const file = fileInput.files[0];
+                if (!file) {
+                    showError('Please select a file to upload first.');
+                    return;
+                }
+
+                showLoading('Uploading image...');
+                uploadBtn.disabled = true;
+                uploadBtn.innerText = 'Uploading...';
+
                 const formData = new FormData();
                 formData.append('file', file);
 
                 try {
-                    // --- THIS IS THE CHANGE ---
-                    // Use fetchWithAuth() instead of fetch()
+                    // Use the global fetchWithAuth function
                     const response = await window.fetchWithAuth("{{ url_for('upload_bot_image') }}", {
                         method: 'POST',
                         body: formData, 
                     });
-                    // --- END OF CHANGE ---
 
                     const data = await response.json();
                     if (response.ok && data.success) {
@@ -137,7 +314,6 @@
                     uploadBtn.innerText = 'Upload Custom Image';
                 }
             });
-
         });
     }, 100); // Wait 100ms for auth script to load
 </script>
