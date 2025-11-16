@@ -1,0 +1,69 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="max-w-md mx-auto bg-gray-800 p-8 rounded-lg shadow-xl">
+    <h1 class="text-3xl font-bold mb-6 text-white text-center">Login</h1>
+    
+    <form id="login-form" class="space-y-6">
+        <div>
+            <label for="email" class="block text-sm font-medium text-gray-300 mb-2">Email</label>
+            <input type="email" id="email" name="email" required
+                   class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+            <label for="password" class="block text-sm font-medium text-gray-300 mb-2">Password</label>
+            <input type="password" id="password" name="password" required
+                   class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        
+        <div id="error-message" class="text-red-400 text-sm hidden"></div>
+        
+        <div>
+            <button type="submit" id="login-btn"
+                    class="w-full p-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition duration-200">
+                Login
+            </button>
+        </div>
+    </form>
+    
+    <p class="text-center text-gray-400 mt-6">
+        Don't have an account? <a href="{{ url_for('register') }}" class="text-indigo-400 hover:underline">Register here</a>
+    </p>
+</div>
+
+<script>
+    // Wait for the layout's main auth script to load
+    setTimeout(() => {
+        const loginForm = document.getElementById('login-form');
+        const loginBtn = document.getElementById('login-btn');
+        const emailEl = document.getElementById('email');
+        const passwordEl = document.getElementById('password');
+        const errorEl = document.getElementById('error-message');
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            loginBtn.disabled = true;
+            loginBtn.innerText = 'Logging in...';
+            errorEl.classList.add('hidden');
+
+            const email = emailEl.value;
+            const password = passwordEl.value;
+
+            try {
+                // Use the Firebase auth SDK
+                await firebase.auth().signInWithEmailAndPassword(email, password);
+                // Auth state change is handled by layout.html
+                // It will send the token and then we redirect
+                window.location.href = "{{ url_for('my_bots') }}"; // Redirect to 'My Bots' page on success
+
+            } catch (error) {
+                console.error('Login Error:', error);
+                errorEl.innerText = error.message;
+                errorEl.classList.remove('hidden');
+                loginBtn.disabled = false;
+                loginBtn.innerText = 'Login';
+            }
+        });
+    }, 100); // Wait 100ms
+</script>
+{% endblock %}
