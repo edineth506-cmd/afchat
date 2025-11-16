@@ -6,6 +6,11 @@
     
     <form id="register-form" class="space-y-6">
         <div>
+            <label for="nickname" class="block text-sm font-medium text-gray-300 mb-2">Nickname</label>
+            <input type="text" id="nickname" name="nickname" required
+                   class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
             <label for="email" class="block text-sm font-medium text-gray-300 mb-2">Email</label>
             <input type="email" id="email" name="email" required
                    class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -35,7 +40,8 @@
 <script type="module">
     // Import the auth functions
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
+    // --- THIS IS THE FIX: Added 'createUserWithEmailAndPassword' and 'updateProfile' ---
+    import { getAuth, createUserWithEmailAndPassword, updateProfile } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
     
     // --- YOUR FIREBASE CONFIG ---
     const firebaseConfig = {
@@ -51,41 +57,53 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
-    // --- THIS IS THE FIX ---
     document.addEventListener('DOMContentLoaded', () => {
         const registerForm = document.getElementById('register-form');
         const registerBtn = document.getElementById('register-btn');
+        const nicknameEl = document.getElementById('nickname'); // <-- NEW
         const emailEl = document.getElementById('email');
         const passwordEl = document.getElementById('password');
         const errorEl = document.getElementById('error-message');
 
-        if (registerForm) {
-            registerForm.addEventListener('submit', async (e) => {
-                e.preventDefault(); // This stops the "refresh"
-                registerBtn.disabled = true;
-                registerBtn.innerText = 'Creating...';
-                errorEl.classList.add('hidden');
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            registerBtn.disabled = true;
+            registerBtn.innerText = 'Creating...';
+            errorEl.classList.add('hidden');
 
-                const email = emailEl.value;
-                const password = passwordEl.value;
+            const email = emailEl.value;
+            const password = passwordEl.value;
+            const nickname = nicknameEl.value; // <-- NEW
 
-                try {
-                    // Use the v9 Firebase auth SDK
-                    await createUserWithEmailAndPassword(auth, email, password);
-                    // Auth state change is handled by layout.html
-                    // It will send the token and then we redirect
-                    window.location.href = "{{ url_for('my_bots') }}"; // Redirect to 'My Bots' page on success
+            if (!nickname.trim()) {
+                errorEl.innerText = "Please enter a nickname.";
+                errorEl.classList.remove('hidden');
+                registerBtn.disabled = false;
+                registerBtn.innerText = 'Create Account';
+                return;
+            }
 
-                } catch (error) {
-                    console.error('Register Error:', error);
-                    errorEl.innerText = error.message;
-                    errorEl.classList.remove('hidden');
-                    registerBtn.disabled = false;
-                    registerBtn.innerText = 'Create Account';
-                }
-            });
-        }
+            try {
+                // Step 1: Create the user
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                
+                // Step 2: Update their profile with the new nickname
+                await updateProfile(userCredential.user, {
+                    displayName: nickname
+                });
+
+                // Auth state change is handled by layout.html
+                // It will send the token (now with the nickname) and then we redirect
+                window.location.href = "{{ url_for('my_bots') }}"; // Redirect to 'My Bots' page on success
+
+            } catch (error) {
+                console.error('Register Error:', error);
+                errorEl.innerText = error.message;
+                errorEl.classList.remove('hidden');
+                registerBtn.disabled = false;
+                registerBtn.innerText = 'Create Account';
+            }
+        });
     });
-    // --- END OF FIX ---
 </script>
 {% endblock %}
