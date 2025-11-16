@@ -1,0 +1,12 @@
+pycache/
+*.pyc
+
+.env
+.env.*
+
+
+serviceAccountKey.json
+
+
+.vscode/
+.idea/
