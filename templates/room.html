@@ -35,8 +35,9 @@
                     <p class="text-sm text-gray-400">
                         Room Code: <strong class="text-white">{{ room_code }}</strong>
                     </p>
+                    <!-- === THIS IS THE FIX === -->
                     <p class="text-sm text-gray-400">
-                        Bot Owner: <strong class="text-white">{{ room.owner_email | default('N/A') }}</strong>
+                        Bot Owner: <strong class="text-white">{{ room.owner_display_name | default('N/A') }}</strong>
                     </p>
                 </div>
                 <!-- Delete Button for Owner -->
@@ -87,7 +88,7 @@
 <script type="module">
     // --- Import the functions we need ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
-    import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+    import { getFirestore, doc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
     import { getAuth } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
 
     // --- YOUR FIREBASE CONFIG ---
@@ -280,7 +281,6 @@
                 }
                 const roomData = doc.data();
                 buildLeaderboardUI(roomData.users);
-                // Check if messages exist before building
                 if (roomData.messages) {
                     buildChatUI(roomData.messages);
                 }
@@ -302,11 +302,10 @@
                 e.preventDefault(); 
                 const message = messageInput.value;
                 if (!message.trim()) return;
-
-                // We need to make sure userNicknames is populated first
+                
                 if (Object.keys(userNicknames).length === 0 && auth.currentUser) {
-                     // Failsafe in case leaderboard hasn't loaded
-                    const roomData = (await getDoc(doc(db, "rooms", roomCode))).data();
+                    const roomSnap = await getDoc(doc(db, "rooms", roomCode));
+                    const roomData = roomSnap.data();
                     buildLeaderboardUI(roomData.users);
                 }
 
@@ -320,7 +319,6 @@
                 try {
                     const formData = new FormData();
                     formData.append('message', messageToSend);
-                    // Use the global fetchWithAuth function
                     const response = await window.fetchWithAuth(messageForm.action, {
                         method: 'POST',
                         body: formData
@@ -338,7 +336,8 @@
             console.error('Could not find message-form');
         }
 
-        // --- Click Event Listeners ---
+        // --- Click Event Listeners (This is the fix) ---
+
         if (headerAvatarBtn) {
             headerAvatarBtn.addEventListener('click', () => {
                 if (botAvatarUrl) {
