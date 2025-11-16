@@ -107,247 +107,253 @@
     const db = getFirestore(app);
     const auth = getAuth(app); 
 
-    // We must wait for the global auth script AND this page's content
-    setTimeout(() => {
-        document.addEventListener('DOMContentLoaded', (event) => {
+    // This script can run right away
+    document.addEventListener('DOMContentLoaded', (event) => {
+    
+        const chatBox = document.getElementById('chat-box');
+        const leaderboard = document.getElementById('leaderboard');
+        const messageForm = document.getElementById('message-form');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const headerAvatarBtn = document.getElementById('header-avatar-btn');
         
-            const chatBox = document.getElementById('chat-box');
-            const leaderboard = document.getElementById('leaderboard');
-            const messageForm = document.getElementById('message-form');
-            const messageInput = document.getElementById('message-input');
-            const sendButton = document.getElementById('send-button');
-            const headerAvatarBtn = document.getElementById('header-avatar-btn');
-            
-            const roomCode = '{{ room_code }}';
-            const currentUserID = '{{ user_id }}'; 
-            const botName = '{{ room.bot_name }}'; 
-            const botAvatarUrl = '{{ room.bot_image_url | default("", true) }}';
-            
-            let userNicknames = {};
-            let typingIndicatorId = null;
+        const roomCode = '{{ room_code }}';
+        const currentUserID = '{{ user_id }}'; 
+        const botName = '{{ room.bot_name }}'; 
+        const botAvatarUrl = '{{ room.bot_image_url | default("", true) }}';
+        
+        let userNicknames = {};
+        let typingIndicatorId = null;
 
-            // --- Helper Functions for Optimistic UI ---
-            
-            function removeTypingIndicator() {
-                if (typingIndicatorId) {
-                    const indicator = document.getElementById(typingIndicatorId);
-                    if (indicator) indicator.parentElement.remove();
-                    typingIndicatorId = null;
-                }
+        // --- Helper Functions for Optimistic UI ---
+        
+        function removeTypingIndicator() {
+            if (typingIndicatorId) {
+                const indicator = document.getElementById(typingIndicatorId);
+                if (indicator) indicator.parentElement.remove();
+                typingIndicatorId = null;
             }
+        }
 
-            function addOptimisticMessage(userId, text) {
-                const displayName = userNicknames[userId] || 'You';
+        function addOptimisticMessage(userId, text) {
+            const displayName = userNicknames[userId] || 'You';
+            const msgEl = document.createElement('div');
+            msgEl.classList.add('chat-bubble', 'chat-bubble-self', 'self-end');
+            msgEl.innerHTML = `<strong class="block">You (${displayName})</strong><p>${text}</p>`;
+            const wrapper = document.createElement('div');
+            wrapper.classList.add('flex', 'justify-end', 'w-full');
+            wrapper.appendChild(msgEl);
+            chatBox.appendChild(wrapper);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function addTypingIndicator() {
+            removeTypingIndicator();
+            typingIndicatorId = 'typing-' + Date.now();
+            const avatarImg = botAvatarUrl ? `<img src="${botAvatarUrl}" alt="avatar" class="chat-avatar cursor-pointer">` : '';
+            const msgEl = document.createElement('div');
+            msgEl.classList.add('chat-bubble', 'chat-bubble-bot', 'self-start');
+            msgEl.id = typingIndicatorId;
+            msgEl.innerHTML = `<strong class="block">${botName}</strong><p class="typing-dots"><span>.</span><span>.</span><span>.</span></p>`;
+            
+            const wrapper = document.createElement('div');
+            wrapper.classList.add('flex', 'justify-start', 'w-full', 'items-end', 'gap-2');
+            if (botAvatarUrl) wrapper.innerHTML += avatarImg;
+            wrapper.appendChild(msgEl);
+            chatBox.appendChild(wrapper);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // --- UI Building Functions (THIS IS THE FIX) ---
+
+        function buildChatUI(messages) {
+            removeTypingIndicator(); 
+            chatBox.innerHTML = ''; 
+            
+            const sortedMessages = messages.sort((a, b) => {
+                if (!a.timestamp) return -1;
+                if (!b.timestamp) return 1;
+                const aMillis = a.timestamp.toMillis ? a.timestamp.toMillis() : a.timestamp;
+                const bMillis = b.timestamp.toMillis ? b.timestamp.toMillis() : b.timestamp;
+                return aMillis - bMillis;
+            });
+
+            sortedMessages.forEach(msg => {
                 const msgEl = document.createElement('div');
-                msgEl.classList.add('chat-bubble', 'chat-bubble-self', 'self-end');
-                msgEl.innerHTML = `<strong class="block">You (${displayName})</strong><p>${text}</p>`;
-                const wrapper = document.createElement('div');
-                wrapper.classList.add('flex', 'justify-end', 'w-full');
-                wrapper.appendChild(msgEl);
-                chatBox.appendChild(wrapper);
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }
-
-            function addTypingIndicator() {
-                removeTypingIndicator();
-                typingIndicatorId = 'typing-' + Date.now();
+                msgEl.classList.add('chat-bubble');
+                let content = '';
+                let displayName = '';
+                
                 const avatarImg = botAvatarUrl ? `<img src="${botAvatarUrl}" alt="avatar" class="chat-avatar cursor-pointer">` : '';
-                const msgEl = document.createElement('div');
-                msgEl.classList.add('chat-bubble', 'chat-bubble-bot', 'self-start');
-                msgEl.id = typingIndicatorId;
-                msgEl.innerHTML = `<strong class="block">${botName}</strong><p class="typing-dots"><span>.</span><span>.</span><span>.</span></p>`;
-                
-                const wrapper = document.createElement('div');
-                wrapper.classList.add('flex', 'justify-start', 'w-full', 'items-end', 'gap-2');
-                if (botAvatarUrl) wrapper.innerHTML += avatarImg;
-                wrapper.appendChild(msgEl);
-                chatBox.appendChild(wrapper);
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }
 
-            // --- UI Building Functions ---
-
-            function buildChatUI(messages) {
-                removeTypingIndicator(); 
-                chatBox.innerHTML = ''; 
-                
-                const sortedMessages = messages.sort((a, b) => {
-                    if (!a.timestamp) return -1;
-                    if (!b.timestamp) return 1;
-                    const aMillis = a.timestamp.toMillis ? a.timestamp.toMillis() : a.timestamp;
-                    const bMillis = b.timestamp.toMillis ? b.timestamp.toMillis() : b.timestamp;
-                    return aMillis - bMillis;
-                });
-
-                sortedMessages.forEach(msg => {
-                    const msgEl = document.createElement('div');
-                    msgEl.classList.add('chat-bubble');
-                    let content = '';
-                    let displayName = '';
-                    
-                    const avatarImg = botAvatarUrl ? `<img src="${botAvatarUrl}" alt="avatar" class="chat-avatar cursor-pointer">` : '';
-
-                    if (msg.user_id === 'System') {
-                        msgEl.classList.add('chat-bubble-system', 'w-full');
-                        content = `<p>${msg.text}</p>`;
-                    } else if (msg.user_id === botName) {
-                        displayName = msg.user_id;
-                        msgEl.classList.add('chat-bubble-bot', 'self-start');
+                // === ALL 'msg.user' changed to 'msg.user_id' ===
+                if (msg.user_id === 'System') {
+                    msgEl.classList.add('chat-bubble-system', 'w-full');
+                    content = `<p>${msg.text}</p>`;
+                } else if (msg.user_id === botName) {
+                    displayName = msg.user_id;
+                    msgEl.classList.add('chat-bubble-bot', 'self-start');
+                    content = `<strong class="block">${displayName}</strong><p>${msg.text}</p>`;
+                } else {
+                    displayName = userNicknames[msg.user_id] || msg.user_id; 
+                    if (msg.user_id === currentUserID) {
+                        msgEl.classList.add('chat-bubble-self', 'self-end');
+                        content = `<strong class="block">You (${displayName})</strong><p>${msg.text}</p>`;
+                    } else {
+                        msgEl.classList.add('chat-bubble-other', 'self-start');
                         content = `<strong class="block">${displayName}</strong><p>${msg.text}</p>`;
-                    } else {
-                        displayName = userNicknames[msg.user_id] || msg.user_id; 
-                        if (msg.user_id === currentUserID) {
-                            msgEl.classList.add('chat-bubble-self', 'self-end');
-                            content = `<strong class="block">You (${displayName})</strong><p>${msg.text}</p>`;
-                        } else {
-                            msgEl.classList.add('chat-bubble-other', 'self-start');
-                            content = `<strong class="block">${displayName}</strong><p>${msg.text}</p>`;
-                        }
                     }
-                    msgEl.innerHTML = content;
+                }
+                msgEl.innerHTML = content;
+                
+                // Alignment wrappers
+                if (msg.user_id === 'System') {
+                    const wrapper = document.createElement('div');
+                    wrapper.classList.add('flex', 'justify-center', 'w-full');
+                    wrapper.appendChild(msgEl);
+                    chatBox.appendChild(wrapper);
+                } else if (msg.user_id === currentUserID) {
+                    const wrapper = document.createElement('div');
+                    wrapper.classList.add('flex', 'justify-end', 'w-full');
+                    wrapper.appendChild(msgEl);
+                    chatBox.appendChild(wrapper);
+                } else {
+                    const wrapper = document.createElement('div');
+                    wrapper.classList.add('flex', 'justify-start', 'w-full', 'items-end', 'gap-2');
                     
-                    // Alignment wrappers
-                    if (msg.user_id === 'System') {
-                        const wrapper = document.createElement('div');
-                        wrapper.classList.add('flex', 'justify-center', 'w-full');
-                        wrapper.appendChild(msgEl);
-                        chatBox.appendChild(wrapper);
-                    } else if (msg.user_id === currentUserID) {
-                        const wrapper = document.createElement('div');
-                        wrapper.classList.add('flex', 'justify-end', 'w-full');
-                        wrapper.appendChild(msgEl);
-                        chatBox.appendChild(wrapper);
-                    } else {
-                        const wrapper = document.createElement('div');
-                        wrapper.classList.add('flex', 'justify-start', 'w-full', 'items-end', 'gap-2');
-                        
-                        if (msg.user_id === botName && botAvatarUrl) {
-                            wrapper.innerHTML = avatarImg;
-                        }
-                        wrapper.appendChild(msgEl);
-                        chatBox.appendChild(wrapper);
+                    if (msg.user_id === botName && botAvatarUrl) {
+                        wrapper.innerHTML = avatarImg;
                     }
-                });
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }
+                    wrapper.appendChild(msgEl);
+                    chatBox.appendChild(wrapper);
+                }
+            });
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
 
-            function buildLeaderboardUI(users) {
-                if (!users) { 
-                    leaderboard.innerHTML = '<p class="text-gray-400">Loading...</p>';
+        function buildLeaderboardUI(users) {
+            if (!users) { 
+                leaderboard.innerHTML = '<p class="text-gray-400">Loading...</p>';
+                return;
+            }
+            leaderboard.innerHTML = '';
+            userNicknames = {}; 
+            Object.keys(users).forEach(userId => {
+                userNicknames[userId] = users[userId].nickname;
+            });
+            
+            if (Object.keys(users).length === 0) {
+                leaderboard.innerHTML = '<p class="text-gray-400">No users in room yet.</p>';
+                return;
+            }
+            
+            const sortedUsers = Object.entries(users).sort(([,a], [,b]) => b.score - a.score);
+            
+            sortedUsers.forEach(([userId, userData]) => {
+                const userEl = document.createElement('div');
+                let displayName = userData.nickname;
+                let score = userData.score;
+                if (userId === currentUserID) displayName = `You (${displayName}) ⭐`;
+                
+                userEl.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-medium ${userId === currentUserID ? 'text-blue-400' : 'text-white'}">${displayName}</span>
+                        <span class="text-lg font-bold ${score === 100 ? 'text-green-400' : 'text-white'}">${score}%</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-2.5">
+                        <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${score}%"></div>
+                    </div>
+                `;
+                leaderboard.appendChild(userEl);
+            });
+        }
+
+        // --- Real-time listener ---
+        const roomRef = doc(db, "rooms", roomCode);
+        onSnapshot(
+            roomRef,
+            (doc) => {
+                if (!doc.exists()) {
+                    console.error("Room no longer exists.");
+                    window.location.href = '/';
                     return;
                 }
-                leaderboard.innerHTML = '';
-                userNicknames = {}; 
-                Object.keys(users).forEach(userId => {
-                    userNicknames[userId] = users[userId].nickname;
-                });
-                
-                if (Object.keys(users).length === 0) {
-                    leaderboard.innerHTML = '<p class="text-gray-400">No users in room yet.</p>';
-                    return;
-                }
-                
-                const sortedUsers = Object.entries(users).sort(([,a], [,b]) => b.score - a.score);
-                
-                sortedUsers.forEach(([userId, userData]) => {
-                    const userEl = document.createElement('div');
-                    let displayName = userData.nickname;
-                    let score = userData.score;
-                    if (userId === currentUserID) displayName = `You (${displayName}) ⭐`;
-                    
-                    userEl.innerHTML = `
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="font-medium ${userId === currentUserID ? 'text-blue-400' : 'text-white'}">${displayName}</span>
-                            <span class="text-lg font-bold ${score === 100 ? 'text-green-400' : 'text-white'}">${score}%</span>
-                        </div>
-                        <div class="w-full bg-gray-700 rounded-full h-2.5">
-                            <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${score}%"></div>
-                        </div>
-                    `;
-                    leaderboard.appendChild(userEl);
-                });
-            }
-
-            // --- Real-time listener ---
-            const roomRef = doc(db, "rooms", roomCode);
-            onSnapshot(
-                roomRef,
-                (doc) => {
-                    if (!doc.exists()) {
-                        console.error("Room no longer exists.");
-                        window.location.href = '/';
-                        return;
-                    }
-                    const roomData = doc.data();
-                    buildLeaderboardUI(roomData.users);
+                const roomData = doc.data();
+                buildLeaderboardUI(roomData.users);
+                // Check if messages exist before building
+                if (roomData.messages) {
                     buildChatUI(roomData.messages);
-                    if (roomData.game_over) {
-                        messageInput.disabled = true;
-                        sendButton.disabled = true;
-                        messageInput.placeholder = "The game has ended!";
-                        removeTypingIndicator();
-                    }
-                },
-                (error) => {
-                    console.error("Error listening to room snapshot:", error)
                 }
-            );
+                if (roomData.game_over) {
+                    messageInput.disabled = true;
+                    sendButton.disabled = true;
+                    messageInput.placeholder = "The game has ended!";
+                    removeTypingIndicator();
+                }
+            },
+            (error) => {
+                console.error("Error listening to room snapshot:", error)
+            }
+        );
 
-            // --- Form submission ---
-            if (messageForm) {
-                messageForm.addEventListener('submit', async (e) => {
-                    e.preventDefault(); 
-                    const message = messageInput.value;
-                    if (!message.trim()) return;
+        // --- Form submission ---
+        if (messageForm) {
+            messageForm.addEventListener('submit', async (e) => {
+                e.preventDefault(); 
+                const message = messageInput.value;
+                if (!message.trim()) return;
 
-                    addOptimisticMessage(currentUserID, message);
-                    addTypingIndicator();
-                    
-                    const messageToSend = message;
-                    messageInput.value = '';
-                    messageInput.focus();
+                // We need to make sure userNicknames is populated first
+                if (Object.keys(userNicknames).length === 0 && auth.currentUser) {
+                     // Failsafe in case leaderboard hasn't loaded
+                    const roomData = (await getDoc(doc(db, "rooms", roomCode))).data();
+                    buildLeaderboardUI(roomData.users);
+                }
 
-                    try {
-                        const formData = new FormData();
-                        formData.append('message', messageToSend);
-                        // Use the global fetchWithAuth function
-                        const response = await window.fetchWithAuth(messageForm.action, {
-                            method: 'POST',
-                            body: formData
-                        });
-                        if (!response.ok) {
-                            console.error('Failed to send message');
-                            removeTypingIndicator();
-                        }
-                    } catch (error) {
-                        console.error('Error sending message:', error);
+                addOptimisticMessage(currentUserID, message);
+                addTypingIndicator();
+                
+                const messageToSend = message;
+                messageInput.value = '';
+                messageInput.focus();
+
+                try {
+                    const formData = new FormData();
+                    formData.append('message', messageToSend);
+                    // Use the global fetchWithAuth function
+                    const response = await window.fetchWithAuth(messageForm.action, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (!response.ok) {
+                        console.error('Failed to send message');
                         removeTypingIndicator();
-                    } 
-                });
-            } else {
-                console.error('Could not find message-form');
-            }
-
-            // --- Click Event Listeners ---
-
-            // 1. For the avatar in the header
-            if (headerAvatarBtn) {
-                headerAvatarBtn.addEventListener('click', () => {
-                    if (botAvatarUrl) {
-                        openImageModal(botAvatarUrl); // Call global function from layout.html
                     }
-                });
-            }
+                } catch (error) {
+                    console.error('Error sending message:', error);
+                    removeTypingIndicator();
+                } 
+            });
+        } else {
+            console.error('Could not find message-form');
+        }
 
-            // 2. For all avatars in the chat box (using Event Delegation)
-            if (chatBox) {
-                chatBox.addEventListener('click', (event) => {
-                    if (event.target.classList.contains('chat-avatar')) {
-                        openImageModal(event.target.src); // Call global function
-                    }
-                });
-            }
-        });
-    }, 100); // Wait 100ms for auth script to load
+        // --- Click Event Listeners ---
+        if (headerAvatarBtn) {
+            headerAvatarBtn.addEventListener('click', () => {
+                if (botAvatarUrl) {
+                    openImageModal(botAvatarUrl);
+                }
+            });
+        }
+
+        if (chatBox) {
+            chatBox.addEventListener('click', (event) => {
+                if (event.target.classList.contains('chat-avatar')) {
+                    openImageModal(event.target.src);
+                }
+            });
+        }
+    });
 </script>
 {% endblock %}
