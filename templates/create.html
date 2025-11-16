@@ -76,7 +76,6 @@
                 >
             </div>
 
-            <!-- === NEW: Public/Private Toggle === -->
             <div class="flex items-center">
                 <input id="is_public" name="is_public" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-600 rounded bg-gray-700 focus:ring-indigo-500">
                 <label for="is_public" class="ml-3 block text-sm font-medium text-gray-300">Make this bot public?</label>
@@ -177,144 +176,142 @@
     </form>
 </div>
 
-<!-- JAVASCRIPT for image handling (Updated) -->
-<script>
-    // We need to wait for the global auth script from layout.html
-    // A simple timeout is the easiest way
-    setTimeout(() => {
-        // All of our JS logic must be inside this listener
-        document.addEventListener('DOMContentLoaded', () => {
-            const generateBtn = document.getElementById('generate-image-btn');
-            const uploadBtn = document.getElementById('upload-image-btn');
-            const fileInput = document.getElementById('file-input');
-            
-            const previewArea = document.getElementById('image-preview-area');
-            const errorArea = document.getElementById('image-error-area');
-            const hiddenUrlInput = document.getElementById('bot_image_url');
-            
-            const tabs = document.querySelectorAll('.tab-btn');
-            const tabContents = document.querySelectorAll('.tab-content');
+<!-- JAVASCRIPT for image handling (THIS IS THE FIX) -->
+<script type="module">
+    // By using type="module", we don't need DOMContentLoaded or setTimeout
+    // This script will correctly wait for the layout.html module to load.
+    // It also gains access to the global `openImageModal` and `window.fetchWithAuth` functions.
 
-            // --- Tab Switching Logic ---
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    tabs.forEach(t => t.classList.remove('active'));
-                    tabContents.forEach(c => c.classList.remove('active'));
-                    tab.classList.add('active');
-                    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-                });
-            });
+    const generateBtn = document.getElementById('generate-image-btn');
+    const uploadBtn = document.getElementById('upload-image-btn');
+    const fileInput = document.getElementById('file-input');
+    
+    const previewArea = document.getElementById('image-preview-area');
+    const errorArea = document.getElementById('image-error-area');
+    const hiddenUrlInput = document.getElementById('bot_image_url');
+    
+    const tabs = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
 
-            // --- Loading Spinner Function ---
-            function showLoading(message) {
-                previewArea.innerHTML = `
-                    <div class="flex flex-col items-center">
-                        <svg class="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span class="mt-2 text-sm">${message}</span>
-                    </div>
-                `;
-                errorArea.classList.add('hidden');
-                errorArea.innerText = '';
-            }
-
-            // --- Show Error Function ---
-            function showError(message) {
-                previewArea.innerHTML = 'Generate or Upload an image';
-                errorArea.innerText = `Error: ${message}`;
-                errorArea.classList.remove('hidden');
-            }
-
-            // --- Show Image Success Function ---
-            function showSuccess(imageUrl) {
-                previewArea.innerHTML = `
-                    <img src="${imageUrl}" alt="Bot Preview" class="w-full h-full object-cover rounded-lg cursor-pointer">
-                `;
-                hiddenUrlInput.value = imageUrl;
-                errorArea.classList.add('hidden');
-                
-                // Add click listener
-                previewArea.addEventListener('click', () => openImageModal(imageUrl));
-            }
-
-            // --- 1. AI Image Generation Logic ---
-            generateBtn.addEventListener('click', async () => {
-                const appearance = document.getElementById('appearance').value;
-                if (!appearance.trim()) {
-                    showError('Please describe the bot\'s appearance first.');
-                    return;
-                }
-
-                showLoading('Generating image... this may take a moment.');
-                generateBtn.disabled = true;
-                generateBtn.innerText = 'Generating...';
-
-                try {
-                    // Use the global fetchWithAuth function
-                    const response = await window.fetchWithAuth("{{ url_for('generate_bot_image') }}", {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            gender: document.getElementById('gender').value,
-                            age: document.getElementById('age').value,
-                            appearance: appearance
-                        }),
-                    });
-
-                    const data = await response.json();
-                    if (response.ok && data.success) {
-                        showSuccess(data.image_url);
-                    } else {
-                        showError(data.error || 'Failed to generate image.');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    showError('A network error occurred. Please try again.');
-                } finally {
-                    generateBtn.disabled = false;
-                    generateBtn.innerText = 'Generate Bot Image';
-                }
-            });
-
-            // --- 2. Custom Image Upload Logic ---
-            uploadBtn.addEventListener('click', async () => {
-                const file = fileInput.files[0];
-                if (!file) {
-                    showError('Please select a file to upload first.');
-                    return;
-                }
-
-                showLoading('Uploading image...');
-                uploadBtn.disabled = true;
-                uploadBtn.innerText = 'Uploading...';
-
-                const formData = new FormData();
-                formData.append('file', file);
-
-                try {
-                    // Use the global fetchWithAuth function
-                    const response = await window.fetchWithAuth("{{ url_for('upload_bot_image') }}", {
-                        method: 'POST',
-                        body: formData, 
-                    });
-
-                    const data = await response.json();
-                    if (response.ok && data.success) {
-                        showSuccess(data.image_url);
-                    } else {
-                        showError(data.error || 'Failed to upload image.');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    showError('A network error occurred. Please try again.');
-                } finally {
-                    uploadBtn.disabled = false;
-                    uploadBtn.innerText = 'Upload Custom Image';
-                }
-            });
+    // --- Tab Switching Logic ---
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
         });
-    }, 100); // Wait 100ms for auth script to load
+    });
+
+    // --- Loading Spinner Function ---
+    function showLoading(message) {
+        previewArea.innerHTML = `
+            <div class="flex flex-col items-center">
+                <svg class="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="mt-2 text-sm">${message}</span>
+            </div>
+        `;
+        errorArea.classList.add('hidden');
+        errorArea.innerText = '';
+    }
+
+    // --- Show Error Function ---
+    function showError(message) {
+        previewArea.innerHTML = 'Generate or Upload an image';
+        errorArea.innerText = `Error: ${message}`;
+        errorArea.classList.remove('hidden');
+    }
+
+    // --- Show Image Success Function ---
+    function showSuccess(imageUrl) {
+        previewArea.innerHTML = `
+            <img src="${imageUrl}" alt="Bot Preview" class="w-full h-full object-cover rounded-lg cursor-pointer">
+        `;
+        hiddenUrlInput.value = imageUrl;
+        errorArea.classList.add('hidden');
+        
+        // Add click listener
+        // We can call openImageModal because it's defined globally in layout.html
+        previewArea.addEventListener('click', () => openImageModal(imageUrl));
+    }
+
+    // --- 1. AI Image Generation Logic ---
+    generateBtn.addEventListener('click', async () => {
+        const appearance = document.getElementById('appearance').value;
+        if (!appearance.trim()) {
+            showError('Please describe the bot\'s appearance first.');
+            return;
+        }
+
+        showLoading('Generating image... this may take a moment.');
+        generateBtn.disabled = true;
+        generateBtn.innerText = 'Generating...';
+
+        try {
+            // Use the global fetchWithAuth function
+            const response = await window.fetchWithAuth("{{ url_for('generate_bot_image') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gender: document.getElementById('gender').value,
+                    age: document.getElementById('age').value,
+                    appearance: appearance
+                }),
+            });
+
+            const data = await response.json();
+            if (response.ok && data.success) {
+                showSuccess(data.image_url);
+            } else {
+                showError(data.error || 'Failed to generate image.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('A network error occurred. Please try again.');
+        } finally {
+            generateBtn.disabled = false;
+            generateBtn.innerText = 'Generate Bot Image';
+        }
+    });
+
+    // --- 2. Custom Image Upload Logic ---
+    uploadBtn.addEventListener('click', async () => {
+        const file = fileInput.files[0];
+        if (!file) {
+            showError('Please select a file to upload first.');
+            return;
+        }
+
+        showLoading('Uploading image...');
+        uploadBtn.disabled = true;
+        uploadBtn.innerText = 'Uploading...';
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            // Use the global fetchWithAuth function
+            const response = await window.fetchWithAuth("{{ url_for('upload_bot_image') }}", {
+                method: 'POST',
+                body: formData, 
+            });
+
+            const data = await response.json();
+            if (response.ok && data.success) {
+                showSuccess(data.image_url);
+            } else {
+                showError(data.error || 'Failed to upload image.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('A network error occurred. Please try again.');
+        } finally {
+            uploadBtn.disabled = false;
+            uploadBtn.innerText = 'Upload Custom Image';
+        }
+    });
 </script>
 {% endblock %}
