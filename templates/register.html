@@ -32,9 +32,26 @@
     </p>
 </div>
 
-<script>
-    // Wait for the layout's main auth script to load
-    setTimeout(() => {
+<script type="module">
+    // Import the auth functions
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
+    
+    // --- YOUR FIREBASE CONFIG ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyCLSLut9ZoyBk6N_oQHYYXZ7WthQCuQlRE",
+      authDomain: "miki-60246.firebaseapp.com",
+      projectId: "miki-60246",
+      storageBucket: "miki-60246.firebasestorage.app",
+      messagingSenderId: "40259793246",
+      appId: "1:40259793246:web:155e68f85c9cf8b0bb5fcf",
+      measurementId: "G-LDDY90PFVK"
+    };
+    // ----------------------------------------------------
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    document.addEventListener('DOMContentLoaded', () => {
         const registerForm = document.getElementById('register-form');
         const registerBtn = document.getElementById('register-btn');
         const emailEl = document.getElementById('email');
@@ -51,8 +68,8 @@
             const password = passwordEl.value;
 
             try {
-                // Use the Firebase auth SDK
-                await firebase.auth().createUserWithEmailAndPassword(email, password);
+                // Use the v9 Firebase auth SDK
+                await createUserWithEmailAndPassword(auth, email, password);
                 // Auth state change is handled by layout.html
                 // It will send the token and then we redirect
                 window.location.href = "{{ url_for('my_bots') }}"; // Redirect to 'My Bots' page on success
@@ -65,6 +82,6 @@
                 registerBtn.innerText = 'Create Account';
             }
         });
-    }, 100); // Wait 100ms
+    });
 </script>
 {% endblock %}
