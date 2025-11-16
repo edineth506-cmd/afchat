@@ -7,8 +7,7 @@
     <!-- Include Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* (All your existing styles: body, chat-bubble, chat-avatar, modal... ) */
-        /* --- Simple dark mode theme --- */
+        /* Simple dark mode theme */
         body {
             background-color: #1a202c; /* Equivalent to bg-gray-900 */
             color: #e2e8f0; /* Equivalent to text-gray-200 */
@@ -48,7 +47,7 @@
             border: 2px solid #6366f1; /* A little indigo border */
         }
 
-        /* --- Fullscreen Image Modal Styles --- */
+        /* Fullscreen Image Modal Styles */
         #image-modal {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -153,10 +152,11 @@
     </script>
 
     <!-- === NEW: FIREBASE AUTH SDKs === -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
-
+    <!-- Note: We are now loading the v9+ modular SDKs -->
     <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+        import { getAuth, onAuthStateChanged, getIdToken } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
+
         // --- YOUR FIREBASE CONFIG ---
         const firebaseConfig = {
           apiKey: "AIzaSyCLSLut9ZoyBk6N_oQHYYXZ7WthQCuQlRE",
@@ -170,8 +170,8 @@
         // ----------------------------------------------------
 
         // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
 
         // --- NEW: Global Auth Logic ---
         const navLinks = document.getElementById('nav-links');
@@ -179,7 +179,7 @@
         const navLoggedOut = document.getElementById('nav-logged-out');
         
         // This function runs on *every page load*
-        auth.onAuthStateChanged(async (user) => {
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
                 // User is logged in
                 navLoggedIn.classList.remove('hidden');
@@ -188,7 +188,7 @@
                 // Get the user's ID token and send it to the server
                 // to be stored in the session cookie
                 try {
-                    const idToken = await user.getIdToken();
+                    const idToken = await getIdToken(user);
                     // Send to our Flask backend
                     await fetch('/set-token', {
                         method: 'POST',
@@ -213,20 +213,17 @@
         window.fetchWithAuth = async (url, options = {}) => {
             const user = auth.currentUser;
             if (!user) {
-                // If no user, redirect to login
                 window.location.href = '/login';
                 return;
             }
 
             try {
-                const idToken = await user.getIdToken();
+                const idToken = await getIdToken(user);
                 
-                // Add the token to the request headers
                 if (!options.headers) {
                     options.headers = {};
                 }
                 
-                // Check if headers are a Headers object or plain object
                 if (options.headers instanceof Headers) {
                     options.headers.set('Authorization', `Bearer ${idToken}`);
                 } else {
@@ -237,7 +234,6 @@
 
             } catch (error) {
                 console.error("Error getting auth token:", error);
-                // If token fails, redirect to login
                 window.location.href = '/login';
                 return;
             }
