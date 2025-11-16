@@ -15,7 +15,6 @@ import google.generativeai as genai
 # --- Firebase ---
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
-# We need 'auth' now ^
 
 # --- Stability AI ---
 import stability_sdk.client as StabilityClient
@@ -39,13 +38,15 @@ try:
     else:
         cred = credentials.Certificate('serviceAccountKey.json')
     
-    # Check if app is already initialized to avoid crashing on Vercel's hot-reloads
     if not firebase_admin._apps:
         firebase_admin.initialize_app(cred)
 except FileNotFoundError:
     print("="*50)
     print("ERROR: serviceAccountKey.json not found (for local dev).")
     print("="*50)
+except ValueError as e:
+    print(f"Firebase already initialized? {e}")
+    pass 
 except json.JSONDecodeError:
     print("="*50)
     print("ERROR: FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON.")
@@ -69,7 +70,7 @@ api_key = os.environ.get('GEMINI_API_KEY')
 if not api_key:
     raise ValueError("GEMINI_API_KEY not found. Set it in Vercel Environment Variables.")
 genai.configure(api_key=api_key) 
-model = genai.GenerativeModel('gemini-2.5-flash')
+model = genai.GenerativeModel('gemini-2.5-flash') 
 
 # --- Configure Stability AI ---
 stability_api_key = os.environ.get("STABILITY_API_KEY")
@@ -91,31 +92,23 @@ if not os.environ.get("CLOUDINARY_CLOUD_NAME"):
     raise ValueError("CLOUDINARY_CLOUD_NAME not found. Set it in Vercel Environment Variables.")
 
 
-# === NEW: Authentication Decorator ===
-# This is a "wrapper" that we'll add to routes we want to protect
+# === Authentication Decorator (Unchanged) ===
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         id_token = request.headers.get('Authorization')
         if not id_token:
-            # If called from a server-side render, check session
             id_token = session.get('id_token')
             if not id_token:
                 return redirect(url_for('login'))
 
-        # Clean up the "Bearer " prefix if it exists
         if id_token.startswith('Bearer '):
             id_token = id_token.split(' ')[1]
             
         try:
-            # Verify the token with Firebase Admin
             decoded_token = auth.verify_id_token(id_token)
-            # Store the user's info in a global 'g' object for this request
             g.user = decoded_token
             g.user_uid = decoded_token['uid']
-        except auth.InvalidIdTokenError:
-            # Token is invalid or expired
-            return redirect(url_for('login'))
         except Exception as e:
             print(f"Token verification error: {e}")
             return redirect(url_for('login'))
@@ -131,10 +124,7 @@ def generate_room_code(length=4):
         if not room_ref.get().exists:
             return code
 
-# We don't need get_user_id() or get_nickname() anymore.
-# We will use g.user_uid and g.user['email']
-
-# --- build_gemini_prompt (Updated) ---
+# --- build_gemini_prompt (Unchanged) ---
 def build_gemini_prompt(room_data, user_nickname, message_text):
     prompt_lines = [
         f"You are {room_data['bot_name']}. Your personality is: {room_data['bot_personality']}.",
@@ -154,8 +144,8 @@ def build_gemini_prompt(room_data, user_nickname, message_text):
     sorted_messages = sorted(room_data.get('messages', []), key=lambda m: m.get('timestamp'))
     
     for msg in sorted_messages[-10:]:
-        sender = msg['user_id'] # Changed from 'user'
-        if sender == room_data['bot_name']: # This is still fine
+        sender = msg['user_id']
+        if sender == room_data['bot_name']:
             sender_display = "You"
         elif sender == "System":
             sender_display = "System"
@@ -197,13 +187,12 @@ def parse_gemini_response(text):
         print(f"Error parsing Gemini response: {e} - Response was: {text}")
         return {"response": text, "affection_change": 0}
 
-# --- index route (Updated) ---
+# --- index route (Unchanged) ---
 @app.route("/")
 def index():
-    # This is now the public bots page
     return redirect(url_for('public_bots'))
 
-# --- === NEW AUTH ROUTES === ---
+# --- AUTH ROUTES (Unchanged) ---
 @app.route("/login")
 def login():
     return render_template("login.html")
@@ -214,13 +203,10 @@ def register():
 
 @app.route("/set-token", methods=["POST"])
 def set_token():
-    """Receives ID token from client-side JS and stores it in the session."""
     try:
         data = request.get_json()
         id_token = data['token']
-        # Verify it once before storing
         auth.verify_id_token(id_token)
-        # Store the token in a secure, HttpOnly session cookie
         session['id_token'] = id_token
         return jsonify({"success": True}), 200
     except Exception as e:
@@ -233,17 +219,16 @@ def logout():
     flash("You have been logged out.")
     return redirect(url_for('login'))
 
-# --- === NEW FEATURE ROUTES === ---
+# --- FEATURE ROUTES ---
 
 @app.route("/public-bots")
 def public_bots():
     bots = []
     try:
-        # Query Firestore for all bots that are public
         bots_ref = db.collection('rooms').where('is_public', '==', True).limit(50)
         for doc in bots_ref.stream():
             bot_data = doc.to_dict()
-            bot_data['id'] = doc.id # Add the room_code as 'id'
+            bot_data['id'] = doc.id
             bots.append(bot_data)
     except Exception as e:
         print(f"Error fetching public bots: {e}")
@@ -252,12 +237,11 @@ def public_bots():
     return render_template("public_bots.html", bots=bots)
 
 @app.route("/my-bots")
-@login_required # Protect this route
+@login_required 
 def my_bots():
     bots = []
-    user_uid = g.user_uid # Get the user's ID from the decorator
+    user_uid = g.user_uid 
     try:
-        # Query Firestore for bots where owner_uid matches
         bots_ref = db.collection('rooms').where('owner_uid', '==', user_uid).limit(50)
         for doc in bots_ref.stream():
             bot_data = doc.to_dict()
@@ -269,11 +253,10 @@ def my_bots():
         
     return render_template("my_bots.html", bots=bots)
 
-# --- /generate-bot-image (Now login protected) ---
+# --- /generate-bot-image (Unchanged) ---
 @app.route("/generate-bot-image", methods=["POST"])
-@login_required # Only logged-in users can generate images
+@login_required
 def generate_bot_image():
-    # ... (function content is exactly the same as before) ...
     try:
         data = request.get_json()
         gender = data.get('gender', 'person')
@@ -309,11 +292,10 @@ def generate_bot_image():
         print(f"Error generating image: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# --- /upload-bot-image (Now login protected) ---
+# --- /upload-bot-image (Unchanged) ---
 @app.route("/upload-bot-image", methods=["POST"])
-@login_required # Only logged-in users can upload images
+@login_required
 def upload_bot_image():
-    # ... (function content is exactly the same as before) ...
     if 'file' not in request.files:
         return jsonify({'success': False, 'error': 'No file part'}), 400
     file = request.files['file']
@@ -335,23 +317,24 @@ def upload_bot_image():
             return jsonify({'success': False, 'error': str(e)}), 500
     return jsonify({'success': False, 'error': 'Unknown file error'}), 500
 
-
-# --- create_room (Updated) ---
+# --- create_room (THIS IS THE FIX) ---
 @app.route("/create", methods=["GET", "POST"])
-@login_required # Protect this route
+@login_required 
 def create_room():
     if request.method == "POST":
         room_code = generate_room_code()
-        user_uid = g.user_uid # Get the logged-in user's ID
-        user_email = g.user.get('email', 'User') # Get their email
+        user_uid = g.user_uid 
+        
+        # --- THIS IS THE FIX ---
+        # Get the user's Display Name (nickname) from the token
+        # Fall back to their email if they don't have one
+        user_display_name = g.user.get('name', g.user.get('email', 'Anonymous'))
         
         bot_name = request.form.get('bot_name', 'Bot')
         start_scenario = request.form.get('start_scenario', 'You meet at a park.')
         bot_image_url = request.form.get('bot_image_url') or "https://placehold.co/100x100/4a5568/FFFFFF?text=Bot"
         bot_appearance = request.form.get('appearance', 'not specified')
-        
-        # --- NEW: Get public/private state ---
-        is_public = request.form.get('is_public') == 'on' # Checkbox value
+        is_public = request.form.get('is_public') == 'on' 
 
         py_timestamp = datetime.utcnow().replace(tzinfo=timezone.utc) 
 
@@ -361,42 +344,39 @@ def create_room():
             'start_scenario': start_scenario,
             'difficulty': int(request.form.get('difficulty', 5)),
             'game_over': False,
-            'users': {}, # A room is empty until someone joins
+            'users': {}, 
             'messages': [
                  {
                     'user_id': 'System', 
-                    'text': f"Game started! {user_email} created the room.",
+                    'text': f"Game started! {user_display_name} created the room.",
                     'timestamp': py_timestamp 
                 },
                 {
-                    'user_id': bot_name, # Bot's message
+                    'user_id': bot_name, 
                     'text': start_scenario,
                     'timestamp': py_timestamp 
                 }
             ],
             'bot_image_url': bot_image_url,
             'bot_appearance': bot_appearance,
-            # --- NEW: Ownership and Public fields ---
             'owner_uid': user_uid,
-            'owner_email': user_email,
+            'owner_display_name': user_display_name, # <-- Store the nickname
             'is_public': is_public
         }
         
         db.collection('rooms').document(room_code).set(new_room_data)
         
-        # Redirect to the 'My Bots' page instead of the room
         return redirect(url_for('my_bots'))
     
     return render_template("create.html")
 
-# --- join_room (Updated) ---
+# --- join_room (THIS IS THE FIX) ---
 @app.route("/join", methods=["GET", "POST"])
-@login_required # User must be logged in to join any room
+@login_required 
 def join_room():
-    room_code = request.args.get('code') # Get from URL parameter
+    room_code = request.args.get('code') 
     
     if request.method == 'POST':
-        # This handles the "Join by Code" form
         room_code = request.form.get('room_code')
 
     if not room_code:
@@ -416,20 +396,23 @@ def join_room():
         flash("Error: This game has already ended.")
         return redirect(url_for('index'))
     
-    # Check if bot is private AND user is not the owner
     if not room_data.get('is_public', False) and room_data.get('owner_uid') != g.user_uid:
-        # This is a private bot. We must join by code.
-        # This logic is fine, as the only way here is if they POSTed a code
-        pass
+        if request.method != 'POST':
+             # If they just tried to access a private URL, deny them
+            flash("This bot is private. Please join with a code.")
+            return redirect(url_for('public_bots'))
+        # If they POSTed, we assume the code is correct and let them in.
 
     user_uid = g.user_uid
-    nickname = g.user.get('email', f"User_{random.randint(100, 999)}")
     
-    # Add user to room if not already in it
+    # --- THIS IS THE FIX ---
+    # Get the user's Display Name (nickname)
+    nickname = g.user.get('name', g.user.get('email', f"User_{random.randint(100, 999)}"))
+    
     if user_uid not in room_data.get('users', {}):
         py_timestamp = datetime.utcnow().replace(tzinfo=timezone.utc)
         room_ref.update({
-            f'users.{user_uid}': {'nickname': nickname, 'score': 0},
+            f'users.{user_uid}': {'nickname': nickname, 'score': 0}, # <-- Save it here
             'messages': firestore.ArrayUnion([
                 {
                     'user_id': 'System',
@@ -439,12 +422,11 @@ def join_room():
             ])
         })
         
-    # User is now in the room, send them to the chat
     return redirect(url_for('chat_room', room_code=room_code))
 
-# --- chat_room (Updated) ---
+# --- chat_room (Unchanged) ---
 @app.route("/room/<room_code>", methods=["GET", "POST"])
-@login_required # Must be logged in to chat
+@login_required
 def chat_room(room_code):
     room_ref = db.collection('rooms').document(room_code)
     room_doc = room_ref.get()
@@ -456,15 +438,12 @@ def chat_room(room_code):
     user_uid = g.user_uid
     room_data = room_doc.to_dict()
     
-    # Get user's nickname from the 'users' dict in the room
-    # This ensures they have properly "joined"
     user_data = room_data.get('users', {}).get(user_uid)
     if not user_data:
-        # User is not in this room. Kick them to the join page.
         flash("You have not joined this room. Joining now...")
         return redirect(url_for('join_room', code=room_code))
     
-    nickname = user_data.get('nickname', 'Player')
+    nickname = user_data.get('nickname', 'Player') # Get their nickname for this room
 
     # Handle a new message submission
     if request.method == "POST":
@@ -477,35 +456,25 @@ def chat_room(room_code):
             
         try:
             py_timestamp_start = datetime.utcnow().replace(tzinfo=timezone.utc)
-
             prompt = build_gemini_prompt(room_data, nickname, message_text)
             response = model.generate_content(prompt)
             parsed_data = parse_gemini_response(response.text)
-            
             bot_response = parsed_data['response']
             affection_change = parsed_data['affection_change']
-
             py_timestamp_end = datetime.utcnow().replace(tzinfo=timezone.utc)
-
             new_score = user_data['score'] + affection_change
             new_score = max(0, min(100, new_score))
-            
             score_msg = f"{nickname}'s affection didn't change. (Still {new_score}%)"
             if affection_change > 0:
                 score_msg = f"{nickname}'s affection went up by {affection_change}%! (Now {new_score}%)"
             elif affection_change < 0:
                 score_msg = f"{nickname}'s affection went down by {abs(affection_change)}%! (Now {new_score}%)"
-
             messages_to_add = [
                 {'user_id': user_uid, 'text': message_text, 'timestamp': py_timestamp_start},
                 {'user_id': room_data['bot_name'], 'text': bot_response, 'timestamp': py_timestamp_end},
                 {'user_id': 'System', 'text': score_msg, 'timestamp': py_timestamp_end}
             ]
-
-            update_data = {
-                f'users.{user_uid}.score': new_score
-            }
-
+            update_data = { f'users.{user_uid}.score': new_score }
             if new_score >= 100:
                 update_data['game_over'] = True
                 messages_to_add.append({
@@ -513,12 +482,9 @@ def chat_room(room_code):
                     'text': f"GAME OVER! {nickname} has won {room_data['bot_name']}'s affection!",
                     'timestamp': py_timestamp_end
                 })
-            
             update_data['messages'] = firestore.ArrayUnion(messages_to_add)
             room_ref.update(update_data)
-            
             return jsonify({'success': True})
-
         except Exception as e:
             print(f"Error during Gemini call: {e}")
             py_timestamp_error = datetime.utcnow().replace(tzinfo=timezone.utc)
@@ -530,56 +496,40 @@ def chat_room(room_code):
             })
             return jsonify({'success': False, 'error': str(e)}), 500
     
-    # Check if the logged-in user is the owner of this bot
     is_owner = (room_data.get('owner_uid') == user_uid)
-
     return render_template("room.html", room=room_data, room_code=room_code, user_id=user_uid, is_owner=is_owner)
 
-
-# --- === NEW DELETE BOT ROUTE === ---
+# --- delete_bot (Unchanged) ---
 @app.route("/delete-bot", methods=["POST"])
 @login_required
 def delete_bot():
     room_code = request.form.get('room_code')
     user_uid = g.user_uid
-
     if not room_code:
         flash("No room code provided.")
         return redirect(url_for('my_bots'))
-    
     room_ref = db.collection('rooms').document(room_code)
     room_doc = room_ref.get()
-
     if not room_doc.exists:
         flash("Room not found.")
         return redirect(url_for('my_bots'))
-
     room_data = room_doc.to_dict()
-
-    # CRITICAL: Check if the logged-in user is the owner
     if room_data.get('owner_uid') != user_uid:
         flash("You do not have permission to delete this bot.")
         return redirect(url_for('my_bots'))
-    
     try:
-        # 1. Delete the bot from Firestore
         room_ref.delete()
-        
-        # 2. (Optional but good) Delete the image from Cloudinary
         image_url = room_data.get('bot_image_url')
         if image_url and 'cloudinary.com' in image_url:
-            # Extract the public_id from the URL
-            # e.g., .../upload/v12345/bot_avatars/bot_abcdef.png
             public_id_match = re.search(r'bot_avatars/([^.]+)', image_url)
             if public_id_match:
                 public_id = f"bot_avatars/{public_id_match.group(1)}"
                 print(f"Deleting image from Cloudinary: {public_id}")
                 cloudinary.uploader.destroy(public_id)
-
         flash(f"Bot '{room_data['bot_name']}' has been deleted.")
-        
     except Exception as e:
         print(f"Error deleting bot: {e}")
         flash(f"An error occurred while deleting the bot: {e}")
-
     return redirect(url_for('my_bots'))
+
+# Note: No if __name__ == '__main__': block, Vercel handles this
